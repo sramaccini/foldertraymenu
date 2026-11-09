@@ -7,6 +7,15 @@ they are opened, so the menu always reflects the current state of the disk.
 A lightweight, open source alternative to SystemTrayMenu: a single native executable (~250 KB),
 no runtime and no installation required.
 
+## Download
+
+**[⬇ FolderTrayMenu.exe](https://github.com/sramaccini/foldertraymenu/releases/latest/download/FolderTrayMenu.exe)**
+(latest release, Windows 10/11 x64) — see all [releases](https://github.com/sramaccini/foldertraymenu/releases).
+
+Save the file anywhere and run it; to start it automatically, use *Start with Windows* in its menu.
+The executable is not code-signed, so Windows SmartScreen may show a warning the first time:
+choose *More info* → *Run anyway*. The SHA-256 checksum of each file is listed in the release notes.
+
 ## Features
 
 - Native Windows menus and submenus, with the same icons as File Explorer
