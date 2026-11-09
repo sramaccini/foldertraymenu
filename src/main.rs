@@ -3,6 +3,7 @@
 
 #![windows_subsystem = "windows"]
 
+mod i18n;
 mod icons;
 mod menu;
 mod settings;
@@ -79,6 +80,7 @@ fn main() {
     }
 
     let mut settings = Settings::load();
+    i18n::set_language(&settings.language);
     if let Some(arg) = std::env::args_os().nth(1).map(PathBuf::from).filter(|p| p.is_dir()) {
         settings.root_folder = std::path::absolute(&arg).unwrap_or(arg);
         settings.save();
@@ -220,15 +222,16 @@ fn execute(hwnd: HWND, action: Action) {
             }
         }
         Action::OpenSettings => {
-            let Some((folder, hotkey)) =
-                with_app(|app| (app.settings.root_folder.clone(), app.settings.hotkey.clone()))
-            else {
+            let Some(current) = with_app(|app| settings_dialog::Choice {
+                folder: app.settings.root_folder.clone(),
+                hotkey: app.settings.hotkey.clone(),
+                language: app.settings.language.clone(),
+            }) else {
                 return;
             };
             // Il dialog ha un proprio ciclo di messaggi: lo stato non deve essere in prestito mentre è aperto.
-            settings_dialog::show(&folder, &hotkey, |folder, hotkey| {
-                with_app(|app| app.apply(folder, hotkey))
-                    .unwrap_or_else(|| Err("Impossibile applicare le impostazioni in questo momento, riprova.".into()))
+            settings_dialog::show(&current, |choice| {
+                with_app(|app| app.apply(choice)).unwrap_or_else(|| Err(i18n::t().apply_busy.into()))
             });
         }
         Action::ToggleHidden => {
@@ -266,17 +269,17 @@ impl App {
     }
 
     /// Applica le impostazioni scelte nel dialog. In caso di errore nulla viene modificato.
-    fn apply(&mut self, folder: PathBuf, hotkey: String) -> Result<(), String> {
+    fn apply(&mut self, choice: settings_dialog::Choice) -> Result<(), String> {
+        let settings_dialog::Choice { folder, hotkey, language } = choice;
         if !folder.is_dir() {
-            return Err(format!("La cartella non esiste:
-{}", folder.display()));
+            return Err(i18n::fmt(i18n::t().folder_missing, &[&folder.display()]));
         }
 
         if hotkey != self.settings.hotkey || !self.hotkey_active {
             let parsed = if hotkey.is_empty() {
                 None
             } else {
-                Some(settings::parse_hotkey(&hotkey).ok_or_else(|| format!("Scorciatoia non valida: {hotkey}"))?)
+                Some(settings::parse_hotkey(&hotkey).ok_or_else(|| i18n::fmt(i18n::t().hotkey_invalid, &[&hotkey]))?)
             };
 
             if self.hotkey_active {
@@ -287,10 +290,7 @@ impl App {
                 if unsafe { RegisterHotKey(self.hwnd, HOTKEY_ID, mods | MOD_NOREPEAT, vk) } == 0 {
                     // Si ripristina la scorciatoia precedente.
                     self.register_hotkey();
-                    return Err(format!(
-                        "La scorciatoia {hotkey} è già usata da un'altra applicazione.
-Scegline un'altra."
-                    ));
+                    return Err(i18n::fmt(i18n::t().hotkey_in_use, &[&hotkey]));
                 }
                 self.hotkey_active = true;
             }
@@ -299,6 +299,8 @@ Scegline un'altra."
         let folder_changed = folder != self.settings.root_folder;
         self.settings.root_folder = folder;
         self.settings.hotkey = hotkey;
+        i18n::set_language(&language);
+        self.settings.language = language;
         self.settings.save();
         if folder_changed {
             self.load_tray_icon();

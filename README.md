@@ -14,7 +14,8 @@ no runtime and no installation required.
 - Hidden extension for shortcuts (`.lnk`, `.url`)
 - Global hotkey to open the menu (default `Ctrl+Alt+Space`)
 - Search by first letter inside the menu
-- **Settings** window to choose the root folder and the hotkey
+- **Settings** window to choose the root folder, the hotkey and the language
+- User interface in English, Italian, German, French, Spanish, Portuguese, Dutch and Polish
 - Optionally show hidden items; start with Windows
 - Single instance; the icon comes back automatically if Windows Explorer restarts
 - High-DPI support (per-monitor DPI awareness)
@@ -27,24 +28,42 @@ no runtime and no installation required.
 | Move around | — | `↑` `↓`; `→` enters a submenu, `←` goes back |
 | Search | — | a letter jumps to the next item starting with that letter; press it again to cycle |
 | Open a file or shortcut | click | `Enter` |
-| Open a folder in File Explorer | "Apri in Esplora file" item at the top of the submenu | same |
+| Open a folder in File Explorer | "Open in File Explorer" item at the top of the submenu | same |
 | Close | click outside the menu | `Esc` |
 
 At the bottom of the menu, the **FolderTrayMenu** submenu contains: open root folder,
 Settings…, show hidden items, start with Windows, exit.
 
-> The user interface is currently in Italian.
-
 ### Settings
 
-The **Impostazioni…** (Settings) item lets you choose:
+The **Settings…** item lets you choose:
 
-- **Root folder**: type the path or use **Sfoglia…** (Browse)
+- **Root folder**: type the path or use **Browse…**
 - **Hotkey**: click in the field and press the desired combination (at least one of Ctrl, Alt and Shift).
-  **Nessuna** (None) disables the hotkey. If the combination is already used by another application,
+  **None** disables the hotkey. If the combination is already used by another application,
   you are told so and the previous hotkey stays active.
+- **Language**: *Automatic* follows the Windows display language (English if it is not supported),
+  or pick one of the available languages. The change applies immediately.
 
 `Tab` moves between fields, `Enter` confirms, `Esc` cancels.
+
+### Languages
+
+| Code | Language |
+|---|---|
+| `en` | English |
+| `it` | Italiano |
+| `de` | Deutsch |
+| `fr` | Français |
+| `es` | Español |
+| `pt` | Português |
+| `nl` | Nederlands |
+| `pl` | Polski |
+
+Translations live in [`src/i18n.rs`](src/i18n.rs). To add a language, add a `Lang` variant,
+a `Strings` table and the Windows primary language ID in `system_language`; the tests check
+that every language has all placeholders and unique keyboard mnemonics.
+Corrections from native speakers are welcome.
 
 ### Configuration file
 
@@ -54,13 +73,17 @@ Settings are saved in `%APPDATA%\FolderTrayMenu\settings.json`:
 {
   "RootFolder": "C:\\Users\\<user>\\TrayMenu",
   "ShowHidden": false,
-  "Hotkey": "Ctrl+Alt+Space"
+  "Hotkey": "Ctrl+Alt+Space",
+  "Language": ""
 }
 ```
 
 `Hotkey` accepts the modifiers `Ctrl`, `Alt`, `Shift`, `Win` and, as the key, a letter, a digit,
 `F1`–`F24`, `Num0`–`Num9`, `Space`, `Insert`, `Delete`, `Home`, `End`, `PageUp`, `PageDown`,
 `Up`, `Down`, `Left`, `Right` or `Pause`. The `Win` key can only be set by editing the file.
+
+`Language` is one of the codes above; empty means the Windows display language.
+
 Manual changes to the file take effect at the next start.
 
 The root folder can also be passed on the command line: `FolderTrayMenu.exe "D:\Links"`.

@@ -21,6 +21,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     MF_SEPARATOR, MF_STRING, MIIM_BITMAP, MNC_SELECT, SetMenuItemInfoW,
 };
 
+use crate::i18n;
 use crate::icons::IconCache;
 use crate::settings::Settings;
 use crate::sys::wide;
@@ -67,28 +68,29 @@ impl MenuBuilder {
     pub fn build_root(&mut self, settings: &Settings, hotkey_label: Option<&str>, autostart: bool) -> HMENU {
         self.actions.clear();
         self.pending.clear();
+        let t = i18n::t();
 
         unsafe {
             let root = CreatePopupMenu();
             if settings.root_folder.is_dir() {
                 self.add_folder_entries(root, &settings.root_folder, settings, false);
             } else {
-                append_disabled(root, &format!("Cartella non trovata: {}", settings.root_folder.display()));
+                append_disabled(root, &i18n::fmt(t.folder_not_found, &[&settings.root_folder.display()]));
             }
             AppendMenuW(root, MF_SEPARATOR, 0, std::ptr::null());
 
             let options = CreatePopupMenu();
-            self.append_action(options, "&Apri cartella radice", Action::OpenRoot, false);
-            self.append_action(options, "&Impostazioni…", Action::OpenSettings, false);
-            self.append_action(options, "Mostra elementi &nascosti", Action::ToggleHidden, settings.show_hidden);
-            self.append_action(options, "Avvia con &Windows", Action::ToggleAutostart, autostart);
+            self.append_action(options, t.menu_open_root, Action::OpenRoot, false);
+            self.append_action(options, t.menu_settings, Action::OpenSettings, false);
+            self.append_action(options, t.menu_show_hidden, Action::ToggleHidden, settings.show_hidden);
+            self.append_action(options, t.menu_autostart, Action::ToggleAutostart, autostart);
             AppendMenuW(options, MF_SEPARATOR, 0, std::ptr::null());
             append_disabled(options, &match hotkey_label {
-                Some(label) => format!("Scorciatoia: {label}"),
-                None => "Scorciatoia: non attiva".to_string(),
+                Some(label) => i18n::fmt(t.menu_hotkey, &[&label]),
+                None => t.menu_hotkey_none.to_string(),
             });
             AppendMenuW(options, MF_SEPARATOR, 0, std::ptr::null());
-            self.append_action(options, "&Esci", Action::Exit, false);
+            self.append_action(options, t.menu_exit, Action::Exit, false);
 
             let label = wide("FolderTrayMenu");
             AppendMenuW(root, MF_POPUP | MF_STRING, options as usize, label.as_ptr());
@@ -112,20 +114,20 @@ impl MenuBuilder {
     fn add_folder_entries(&mut self, menu: HMENU, folder: &Path, settings: &Settings, is_submenu: bool) {
         if is_submenu {
             // Unico modo, con i menu nativi, per aprire la cartella stessa anche da tastiera.
-            self.append_action(menu, "Apri in Esplora file", Action::Open(folder.to_path_buf()), false);
+            self.append_action(menu, i18n::t().open_in_explorer, Action::Open(folder.to_path_buf()), false);
             unsafe { AppendMenuW(menu, MF_SEPARATOR, 0, std::ptr::null()) };
         }
 
         let entries = match read_entries(folder, settings.show_hidden) {
             Ok(entries) => entries,
             Err(err) => {
-                append_disabled(menu, &format!("(impossibile leggere: {err})"));
+                append_disabled(menu, &i18n::fmt(i18n::t().cannot_read, &[&err]));
                 return;
             }
         };
 
         if entries.is_empty() {
-            append_disabled(menu, "(vuota)");
+            append_disabled(menu, i18n::t().empty_folder);
             return;
         }
 

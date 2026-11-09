@@ -26,14 +26,15 @@ use windows_sys::Win32::UI::HiDpi::{
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, SetFocus};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, ES_AUTOHSCROLL,
+    BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, ES_AUTOHSCROLL,
     GetCursorPos, GetMessageW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IDCANCEL, IDOK, IsDialogMessageW,
     LoadCursorW, MSG, NONCLIENTMETRICSW, PostQuitMessage, RegisterClassW, SPI_GETNONCLIENTMETRICS, SW_SHOW,
     SWP_NOACTIVATE, SWP_NOZORDER, SendMessageW, SetForegroundWindow, SetWindowPos, SetWindowTextW, ShowWindow,
     TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_DPICHANGED, WM_SETFONT, WM_USER, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 
+use crate::i18n::{self, ALL as LANGUAGES};
 use crate::settings::{format_hotkey, is_extended_key, parse_hotkey};
 use crate::sys::{self, wide};
 
@@ -52,11 +53,20 @@ const ID_FOLDER: i32 = 100;
 const ID_BROWSE: i32 = 101;
 const ID_HOTKEY: i32 = 102;
 const ID_CLEAR: i32 = 103;
+const ID_LANGUAGE: i32 = 104;
 
 /// Area client in pixel logici (96 DPI).
 const CLIENT_WIDTH: i32 = 440;
-const CLIENT_HEIGHT: i32 = 214;
+const CLIENT_HEIGHT: i32 = 284;
 const WINDOW_STYLE_MAIN: WINDOW_STYLE = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
+
+/// Valori mostrati e restituiti dal dialog.
+pub struct Choice {
+    pub folder: PathBuf,
+    pub hotkey: String,
+    /// Codice lingua; vuoto = lingua di Windows.
+    pub language: String,
+}
 
 #[derive(Clone, Copy)]
 enum Command {
@@ -68,6 +78,7 @@ struct Dialog {
     hwnd: HWND,
     folder_edit: HWND,
     hotkey_ctrl: HWND,
+    language_combo: HWND,
     /// Controlli figli con posizione in pixel logici: x, y, larghezza, altezza.
     layout: Vec<(HWND, [i32; 4])>,
     font: HFONT,
@@ -84,9 +95,9 @@ thread_local! {
 }
 
 /// Mostra il dialog e ritorna alla chiusura. `apply` viene chiamata alla pressione
-/// di OK con cartella e scorciatoia scelte: se restituisce un errore questo viene
-/// mostrato e il dialog resta aperto.
-pub fn show(folder: &Path, hotkey: &str, apply: impl Fn(PathBuf, String) -> Result<(), String>) {
+/// di OK con i valori scelti: se restituisce un errore questo viene mostrato e il
+/// dialog resta aperto.
+pub fn show(current: &Choice, apply: impl Fn(Choice) -> Result<(), String>) {
     // Già aperto (es. richiesto di nuovo dal menu della tray): lo si porta in primo piano.
     let existing = DIALOG.with(|d| d.try_borrow().ok().and_then(|d| d.as_ref().map(|d| d.hwnd)));
     if let Some(hwnd) = existing {
@@ -97,7 +108,7 @@ pub fn show(folder: &Path, hotkey: &str, apply: impl Fn(PathBuf, String) -> Resu
         return;
     }
 
-    let Some(hwnd) = create(folder, hotkey) else { return };
+    let Some(hwnd) = create(&current.folder, &current.hotkey, &current.language) else { return };
 
     unsafe {
         let mut msg: MSG = std::mem::zeroed();
@@ -133,7 +144,8 @@ pub fn show(folder: &Path, hotkey: &str, apply: impl Fn(PathBuf, String) -> Resu
     }
 }
 
-fn create(folder: &Path, hotkey: &str) -> Option<HWND> {
+fn create(folder: &Path, hotkey: &str, language: &str) -> Option<HWND> {
+    let t = i18n::t();
     unsafe {
         let controls = INITCOMMONCONTROLSEX {
             dwSize: size_of::<INITCOMMONCONTROLSEX>() as u32,
@@ -166,7 +178,7 @@ fn create(folder: &Path, hotkey: &str) -> Option<HWND> {
         let x = work.left + ((work.right - work.left) - width) / 2;
         let y = work.top + ((work.bottom - work.top) - height) / 2;
 
-        let title = wide("Impostazioni – FolderTrayMenu");
+        let title = wide(t.settings_title);
         let hwnd = CreateWindowExW(
             0,
             class.as_ptr(),
@@ -211,7 +223,7 @@ fn create(folder: &Path, hotkey: &str) -> Option<HWND> {
         };
 
         // L'ordine di creazione è l'ordine di Tab.
-        add("STATIC", "&Cartella radice", static_style, 0, -1, [16, 14, 408, 18]);
+        add("STATIC", t.root_folder_label, static_style, 0, -1, [16, 14, 408, 18]);
         let folder_edit = add(
             "EDIT",
             &folder.display().to_string(),
@@ -220,9 +232,9 @@ fn create(folder: &Path, hotkey: &str) -> Option<HWND> {
             ID_FOLDER,
             [16, 34, 316, 24],
         );
-        add("BUTTON", "&Sfoglia…", button_style, 0, ID_BROWSE, [340, 33, 84, 26]);
+        add("BUTTON", t.browse, button_style, 0, ID_BROWSE, [340, 33, 84, 26]);
 
-        add("STATIC", "Scorciatoia per aprire il &menu", static_style, 0, -1, [16, 74, 408, 18]);
+        add("STATIC", t.hotkey_label, static_style, 0, -1, [16, 74, 408, 18]);
         let hotkey_ctrl = add(
             "msctls_hotkey32",
             "",
@@ -231,29 +243,48 @@ fn create(folder: &Path, hotkey: &str) -> Option<HWND> {
             ID_HOTKEY,
             [16, 94, 316, 24],
         );
-        add("BUTTON", "&Nessuna", button_style, 0, ID_CLEAR, [340, 93, 84, 26]);
+        add("BUTTON", t.hotkey_clear, button_style, 0, ID_CLEAR, [340, 93, 84, 26]);
 
         let parsed = parse_hotkey(hotkey);
-        let mut hint = String::from(
-            "Fai clic nel campo e premi la combinazione (con Ctrl, Alt o Shift). «Nessuna» disattiva la scorciatoia.",
+        let hint = if parsed.is_some_and(|(mods, _)| mods & MOD_WIN != 0) {
+            i18n::fmt(t.hotkey_hint_win, &[&hotkey])
+        } else {
+            t.hotkey_hint.to_string()
+        };
+        add("STATIC", &hint, static_style, 0, -1, [16, 124, 408, 48]);
+
+        add("STATIC", t.language_label, static_style, 0, -1, [16, 182, 408, 18]);
+        // Per una combo a discesa l'altezza include l'elenco aperto.
+        let language_combo = add(
+            "COMBOBOX",
+            "",
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST as u32,
+            0,
+            ID_LANGUAGE,
+            [16, 202, 240, 240],
         );
-        if parsed.is_some_and(|(mods, _)| mods & MOD_WIN != 0) {
-            hint = format!(
-                "La scorciatoia attuale è {hotkey}: il campo non può mostrare il tasto Win, \
-                 ma viene mantenuta se non la modifichi."
-            );
-        }
-        add("STATIC", &hint, static_style, 0, -1, [16, 124, 408, 36]);
 
         add(
             "BUTTON",
-            "OK",
+            t.ok,
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON as u32,
             0,
             IDOK,
-            [256, 174, 80, 28],
+            [256, 244, 80, 28],
         );
-        add("BUTTON", "Annulla", button_style, 0, IDCANCEL, [344, 174, 80, 28]);
+        add("BUTTON", t.cancel, button_style, 0, IDCANCEL, [344, 244, 80, 28]);
+
+        // Elenco lingue: "Automatica" e poi ogni lingua col proprio nome.
+        let auto = wide(t.language_auto);
+        SendMessageW(language_combo, CB_ADDSTRING, 0, auto.as_ptr() as LPARAM);
+        for lang in LANGUAGES {
+            let name = wide(lang.native_name());
+            SendMessageW(language_combo, CB_ADDSTRING, 0, name.as_ptr() as LPARAM);
+        }
+        let selected = i18n::Lang::from_code(language)
+            .and_then(|l| LANGUAGES.iter().position(|&x| x == l))
+            .map_or(0, |i| i + 1);
+        SendMessageW(language_combo, CB_SETCURSEL, selected, 0);
 
         // Valore iniziale del controllo hotkey; senza modificatori il controllo forza Ctrl+Alt.
         SendMessageW(hotkey_ctrl, HKM_SETRULES, HKCOMB_NONE | HKCOMB_S, (HOTKEYF_CONTROL | HOTKEYF_ALT) as LPARAM);
@@ -264,6 +295,7 @@ fn create(folder: &Path, hotkey: &str) -> Option<HWND> {
             hwnd,
             folder_edit,
             hotkey_ctrl,
+            language_combo,
             layout,
             font: null_mut(),
             initial_value,
@@ -410,9 +442,12 @@ fn browse(hwnd: HWND) {
     }
 }
 
-fn accept(hwnd: HWND, apply: &impl Fn(PathBuf, String) -> Result<(), String>) {
-    let Some((edit, hotkey_ctrl, initial_value, initial_hotkey)) = DIALOG.with(|d| {
-        d.borrow().as_ref().map(|d| (d.folder_edit, d.hotkey_ctrl, d.initial_value, d.initial_hotkey.clone()))
+fn accept(hwnd: HWND, apply: &impl Fn(Choice) -> Result<(), String>) {
+    let t = i18n::t();
+    let Some((edit, hotkey_ctrl, combo, initial_value, initial_hotkey)) = DIALOG.with(|d| {
+        d.borrow()
+            .as_ref()
+            .map(|d| (d.folder_edit, d.hotkey_ctrl, d.language_combo, d.initial_value, d.initial_hotkey.clone()))
     }) else {
         return;
     };
@@ -420,13 +455,13 @@ fn accept(hwnd: HWND, apply: &impl Fn(PathBuf, String) -> Result<(), String>) {
     let folder_text = window_text(edit);
     let folder_text = folder_text.trim().trim_matches('"');
     if folder_text.is_empty() {
-        sys::message_box(hwnd, "Indica la cartella radice.");
+        sys::message_box(hwnd, t.folder_required);
         unsafe { SetFocus(edit) };
         return;
     }
     let folder = std::path::absolute(folder_text).unwrap_or_else(|_| PathBuf::from(folder_text));
     if !folder.is_dir() {
-        sys::message_box(hwnd, &format!("La cartella non esiste:\n{}", folder.display()));
+        sys::message_box(hwnd, &i18n::fmt(t.folder_missing, &[&folder.display()]));
         unsafe { SetFocus(edit) };
         return;
     }
@@ -440,19 +475,21 @@ fn accept(hwnd: HWND, apply: &impl Fn(PathBuf, String) -> Result<(), String>) {
         match hotkey_text(value) {
             Some(text) => text,
             None => {
-                sys::message_box(
-                    hwnd,
-                    "Tasto non supportato per la scorciatoia.\n\
-                     Usa una lettera, una cifra, F1–F24, il tastierino numerico, Spazio, \
-                     le frecce, Ins, Canc, Home, Fine, PagSu, PagGiù o Pausa.",
-                );
+                sys::message_box(hwnd, t.key_unsupported);
                 unsafe { SetFocus(hotkey_ctrl) };
                 return;
             }
         }
     };
 
-    match apply(folder, hotkey) {
+    let selected = unsafe { SendMessageW(combo, CB_GETCURSEL, 0, 0) };
+    let language = usize::try_from(selected)
+        .ok()
+        .and_then(|i| i.checked_sub(1))
+        .and_then(|i| LANGUAGES.get(i))
+        .map_or(String::new(), |l| l.code().to_string());
+
+    match apply(Choice { folder, hotkey, language }) {
         Ok(()) => close(),
         Err(message) => sys::message_box(hwnd, &message),
     }

@@ -50,7 +50,7 @@ pub fn shell_open(hwnd: HWND, path: &Path) {
     // Valori <= 32 indicano un errore. L'annullamento di un prompt UAC (5) non va segnalato.
     let code = result as isize;
     if code <= 32 && code != 5 {
-        message_box(hwnd, &format!("Impossibile aprire:\n{}\n\nCodice errore: {code}", path.display()));
+        message_box(hwnd, &crate::i18n::fmt(crate::i18n::t().open_failed, &[&path.display(), &code]));
     }
 }
 
@@ -97,7 +97,7 @@ pub fn pick_folder(hwnd: HWND, initial: &Path) -> Option<PathBuf> {
         0
     }
 
-    let title = wide("Cartella da mostrare nel menu");
+    let title = wide(crate::i18n::t().pick_folder_title);
     let initial = wide(initial);
     let mut display = [0u16; MAX_PATH as usize];
 

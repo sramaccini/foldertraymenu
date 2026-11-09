@@ -17,6 +17,8 @@ pub struct Settings {
     pub show_hidden: bool,
     /// Scorciatoia globale per aprire il menu, es. "Ctrl+Alt+Space". Vuota = disattivata.
     pub hotkey: String,
+    /// Codice lingua dell'interfaccia ("en", "it", …). Vuoto = lingua di Windows.
+    pub language: String,
 }
 
 impl Default for Settings {
@@ -26,6 +28,7 @@ impl Default for Settings {
             root_folder: home.join("TrayMenu"),
             show_hidden: false,
             hotkey: "Ctrl+Alt+Space".into(),
+            language: String::new(),
         }
     }
 }
