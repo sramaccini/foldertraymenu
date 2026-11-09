@@ -1,79 +1,81 @@
 # FolderTrayMenu
 
-Icona nella system tray di Windows che mostra il contenuto di una cartella come menu,
-navigabile con mouse e tastiera. Le sottocartelle diventano sottomenu, letti solo quando
-vengono aperti: il menu riflette sempre lo stato attuale del disco.
+A Windows system tray icon that shows the contents of a folder as a menu,
+navigable with both mouse and keyboard. Subfolders become submenus, read only when
+they are opened, so the menu always reflects the current state of the disk.
 
-Alternativa leggera e open source a SystemTrayMenu: un unico eseguibile nativo (~250 KB),
-senza runtime né installazione.
+A lightweight, open source alternative to SystemTrayMenu: a single native executable (~250 KB),
+no runtime and no installation required.
 
-## Funzionalità
+## Features
 
-- Menu e sottomenu nativi di Windows, con le icone di Esplora file
-- Ordinamento come Esplora file: prima le cartelle, poi i file, in ordine naturale (`file2` prima di `file10`)
-- Estensione nascosta per collegamenti (`.lnk`, `.url`)
-- Scorciatoia globale per aprire il menu (default `Ctrl+Alt+Space`)
-- Ricerca per lettera iniziale all'interno del menu
-- Finestra **Impostazioni** per scegliere cartella radice e scorciatoia
-- Elementi nascosti mostrabili a richiesta, avvio automatico con Windows
-- Una sola istanza; l'icona ricompare da sola se Esplora risorse viene riavviato
-- Supporto per monitor ad alta risoluzione (DPI per monitor)
+- Native Windows menus and submenus, with the same icons as File Explorer
+- File Explorer ordering: folders first, then files, in natural order (`file2` before `file10`)
+- Hidden extension for shortcuts (`.lnk`, `.url`)
+- Global hotkey to open the menu (default `Ctrl+Alt+Space`)
+- Search by first letter inside the menu
+- **Settings** window to choose the root folder and the hotkey
+- Optionally show hidden items; start with Windows
+- Single instance; the icon comes back automatically if Windows Explorer restarts
+- High-DPI support (per-monitor DPI awareness)
 
-## Uso
+## Usage
 
-| Azione | Mouse | Tastiera |
+| Action | Mouse | Keyboard |
 |---|---|---|
-| Aprire il menu | clic sinistro o destro sull'icona | scorciatoia globale, oppure `Win+B`, frecce fino all'icona, `Invio` |
-| Muoversi | — | `↑` `↓`; `→` entra in un sottomenu, `←` torna indietro |
-| Cercare | — | una lettera porta alla voce successiva che inizia con quella lettera; ripetendola si scorre |
-| Aprire file o collegamento | clic | `Invio` |
-| Aprire una cartella in Esplora file | voce "Apri in Esplora file" in cima al sottomenu | idem |
-| Chiudere | clic fuori dal menu | `Esc` |
+| Open the menu | left or right click on the icon | global hotkey, or `Win+B`, arrow keys to the icon, `Enter` |
+| Move around | — | `↑` `↓`; `→` enters a submenu, `←` goes back |
+| Search | — | a letter jumps to the next item starting with that letter; press it again to cycle |
+| Open a file or shortcut | click | `Enter` |
+| Open a folder in File Explorer | "Apri in Esplora file" item at the top of the submenu | same |
+| Close | click outside the menu | `Esc` |
 
-In fondo al menu, il sottomenu **FolderTrayMenu** contiene: apri cartella radice,
-Impostazioni…, mostra elementi nascosti, avvia con Windows, esci.
+At the bottom of the menu, the **FolderTrayMenu** submenu contains: open root folder,
+Settings…, show hidden items, start with Windows, exit.
 
-### Impostazioni
+> The user interface is currently in Italian.
 
-Dalla voce **Impostazioni…** si sceglie:
+### Settings
 
-- **Cartella radice**: si digita il percorso o si usa **Sfoglia…**
-- **Scorciatoia**: si fa clic nel campo e si preme la combinazione desiderata (almeno uno tra Ctrl, Alt e Shift).
-  **Nessuna** disattiva la scorciatoia. Se la combinazione è già usata da un'altra applicazione viene segnalato
-  e resta attiva quella precedente.
+The **Impostazioni…** (Settings) item lets you choose:
 
-`Tab` passa da un campo all'altro, `Invio` conferma, `Esc` annulla.
+- **Root folder**: type the path or use **Sfoglia…** (Browse)
+- **Hotkey**: click in the field and press the desired combination (at least one of Ctrl, Alt and Shift).
+  **Nessuna** (None) disables the hotkey. If the combination is already used by another application,
+  you are told so and the previous hotkey stays active.
 
-### File di configurazione
+`Tab` moves between fields, `Enter` confirms, `Esc` cancels.
 
-Le impostazioni sono salvate in `%APPDATA%\FolderTrayMenu\settings.json`:
+### Configuration file
+
+Settings are saved in `%APPDATA%\FolderTrayMenu\settings.json`:
 
 ```json
 {
-  "RootFolder": "C:\\Users\\<utente>\\TrayMenu",
+  "RootFolder": "C:\\Users\\<user>\\TrayMenu",
   "ShowHidden": false,
   "Hotkey": "Ctrl+Alt+Space"
 }
 ```
 
-`Hotkey` accetta i modificatori `Ctrl`, `Alt`, `Shift`, `Win` e come tasto una lettera, una cifra,
+`Hotkey` accepts the modifiers `Ctrl`, `Alt`, `Shift`, `Win` and, as the key, a letter, a digit,
 `F1`–`F24`, `Num0`–`Num9`, `Space`, `Insert`, `Delete`, `Home`, `End`, `PageUp`, `PageDown`,
-`Up`, `Down`, `Left`, `Right` o `Pause`. Il tasto `Win` si può impostare solo modificando il file.
-Le modifiche manuali al file valgono dal riavvio successivo.
+`Up`, `Down`, `Left`, `Right` or `Pause`. The `Win` key can only be set by editing the file.
+Manual changes to the file take effect at the next start.
 
-La cartella radice si può passare anche da riga di comando: `FolderTrayMenu.exe "D:\Link"`.
+The root folder can also be passed on the command line: `FolderTrayMenu.exe "D:\Links"`.
 
-## Compilazione
+## Building
 
-Requisiti: toolchain Rust MSVC (`rustup`) e Visual Studio Build Tools con i componenti C++ e il Windows SDK.
+Requirements: the Rust MSVC toolchain (`rustup`) and Visual Studio Build Tools with the C++ components and the Windows SDK.
 
 ```
 cargo build --release
 cargo test
 ```
 
-L'eseguibile si trova in `target\release\FolderTrayMenu.exe`.
+The executable is written to `target\release\FolderTrayMenu.exe`.
 
-## Licenza
+## License
 
-Distribuito con licenza [Mozilla Public License 2.0](LICENSE).
+Distributed under the [Mozilla Public License 2.0](LICENSE).
